@@ -1,0 +1,401 @@
+---
+title: "scRNAseq Whole-Joint"
+author: "Maria Blumenkrantz"
+output: html_document
+date: "2023-07-17"
+---
+
+```{r setup, include=TRUE}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(Matrix)
+library(patchwork)
+library(RColorBrewer)
+```
+
+
+```{r Object Import, warning=FALSE}
+
+Ctrl1.Pool <- CreateSeuratObject(counts = ctrl1.pool.10X, project = "Ctrl1 Pool", mincells = 3, min.features = 200)
+Ctrl2.Single <- CreateSeuratObject(counts = ctrl2.single.10X, project = "Ctrl2 Single", mincells = 3, min.features = 200)
+WJ.70d.Pool <- CreateSeuratObject(counts = injury.70d.pool.10X, project = "70dpjr pool", mincells = 3, min.features = 200)
+WJ.70d.Single <- CreateSeuratObject(counts = injury.70d.single.10X, project = "70dpjr single", mincells = 3, min.features = 200)
+WJ.28d.Pool <- CreateSeuratObject(counts = injury.28d.pool.10X, project = "28dpjr pool", mincells = 3, min.features = 200)
+WJ.28d.Single <- CreateSeuratObject(counts = injury.28d.single.10X, project = "28dpjr single", mincells = 3, min.features = 200)
+WJ.14d.Pool <- CreateSeuratObject(counts = injury.14d.pool.10X, project = "14dpjr pool", mincells = 3, min.features = 200)
+WJ.14d.Single <- CreateSeuratObject(counts = injury.14d.single.10X, project = "14dpjr single", mincells = 3, min.features = 200)
+Ctrl3.Pool <- CreateSeuratObject(counts = ctrl3.pool.10X, project = "Ctrl3 Pool", mincells = 3, min.features = 200)
+Ctrl4.Single <- CreateSeuratObject(counts = ctrl4.single.10X, project = "Ctrl4 Single", mincells = 3, min.features = 200)
+WJ.7d.Pool <- CreateSeuratObject(counts = injury.7d.pool.10X, project = "7dpjr pool", mincells = 3, min.features = 200)
+WJ.7d.Single <- CreateSeuratObject(counts = injury.7d.single.10x, project = "7dpjr single", mincells = 3, min.features = 200)
+WJ.3d.Pool <- CreateSeuratObject(counts = injury.3d.pool.10X, project = "3dpjr pool", mincells = 3, min.features = 200)
+WJ.3d.Single <- CreateSeuratObject(counts = injury.3d.single.10X, project = "3dpjr single", mincells = 3, min.features = 200)
+WJ.1d.Pool <- CreateSeuratObject(counts = injury.1d.pool.10X, project = "1dpjr pool", mincells = 3, min.features = 200)
+WJ.1d.Single <- CreateSeuratObject(counts = injury.1d.single.10X, project = "1dpjr single", mincells = 3, min.features = 200)
+
+Ctrl1.Pool[["percent.mt"]] <- PercentageFeatureSet(Ctrl1.Pool, pattern = "^mt-")
+Ctrl2.Single[[".mt"]] <- PercentageFeatureSet(Ctrl2.Single, pattern = "^mt-")
+WJ.70d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.70d.Pool, pattern = "^mt-")
+WJ.70d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.70d.Single, pattern = "^mt-")
+WJ.28d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.28d.Pool, pattern = "^mt-")
+WJ.28d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.28d.Single, pattern = "^mt-")
+WJ.14d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.14d.Pool, pattern = "^mt-")
+WJ.14d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.14d.Single, pattern = "^mt-")
+Ctrl3.Pool[["percent.mt"]] <- PercentageFeatureSet(Ctrl3.Pool, pattern = "^mt-")
+Ctrl4.Single[["percent.mt"]] <- PercentageFeatureSet(Ctrl4.Single, pattern = "^mt-")
+WJ.7d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.7d.Pool, pattern = "^mt-")
+WJ.7d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.7d.Single, pattern = "^mt-")
+WJ.3d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.3d.Pool, pattern = "^mt-")
+WJ.3d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.3d.Single, pattern = "^mt-")
+WJ.1d.Pool[["percent.mt"]] <- PercentageFeatureSet(WJ.1d.Pool, pattern = "^mt-")
+WJ.1d.Single[["percent.mt"]] <- PercentageFeatureSet(WJ.1d.Single, pattern = "^mt-")
+```
+
+```{r Merging CDS Files}
+WJRegenRealigned <- merge(x = Ctrl1.Pool, y = c(Ctrl2.Single, WJ.70d.Pool, WJ.70d.Single, WJ.28d.Pool, WJ.28d.Single, WJ.14d.Pool, WJ.14d.Single, Ctrl3.Pool, Ctrl4.Single, WJ.7d.Pool, WJ.7d.Single, WJ.3d.Pool, WJ.3d.Single, WJ.1d.Pool, WJ.1d.Single),
+                add.cell.ids = c("Ctrl1.Pool", "Ctrl2.Single", "WJ 70d Pool", "WJ 70d Single", "WJ 28d Pool", "WJ 28d Single", "WJ 14d Pool", "WJ 14d Single", "Ctrl3.Pool", "Ctrl4.Single", "WJ 7d Pool", "WJ 7d Single", "WJ 3d Pool", "WJ 3d Single", "WJ 1d Pool", "WJ 1d Single"), 
+                project = "Whole Joint Regeneration")
+```
+
+# Establishing Object
+
+```{r Filtering Data}
+VlnPlot(WJRegenRealigned, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol=3, raster = FALSE)
+WJRegenRealigned <- subset(WJRegenRealigned, subset = nFeature_RNA > 600 & nFeature_RNA < 2500 & percent.mt < 7)
+VlnPlot(WJRegenRealigned, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol=3)
+```
+
+```{r Normalize and find variable features}
+WJRegenRealigned.list <- SplitObject(WJRegenRealigned, split.by = "orig.ident")
+WJRegenRealigned.list <- lapply(X = WJRegenRealigned.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst")
+})
+```
+
+```{r Finding Integration Anchors}
+#Remove Ctrl1 from list due to too few cells
+WJRegenRealigned.list <- WJRegenRealigned.list[-1]
+features <- SelectIntegrationFeatures(object.list = WJRegenRealigned.list)
+WJRegenRealigned.list <- lapply(X = WJRegenRealigned.list, FUN = function(x) {
+    x <- ScaleData(x, features = features, verbose = FALSE)
+    x <- RunPCA(x, features = features, verbose = FALSE)
+})
+
+```
+
+```{r Integration}
+anchors <- FindIntegrationAnchors(object.list = WJRegenRealigned.list, reference = c(1, 2), reduction = "rpca",
+    dims = 1:50)
+WJRegenRealigned.integrated <- IntegrateData(anchorset = anchors, dims = 1:50)
+```
+
+```{r Scaling Data and PCA}
+all.genes <- rownames(WJRegenRealigned.integrated)
+WJRegenRealigned.integrated <- ScaleData(WJRegenRealigned.integrated, features = all.genes, verbose = FALSE)
+WJRegenRealigned.integrated <- RunPCA(WJRegenRealigned.integrated, verbose = FALSE, npcs = 150)
+```
+
+```{r Testing Dimensionality}
+DimHeatmap(WJRegenRealigned.integrated, dims=1:6, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=7:12, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=13:18, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=19:24, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=25:30, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=31:36, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=37:42, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=43:50, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=53:58, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=59:64, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=65:70, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=71:76, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=75:80, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=81:86, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=87:92, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=93:100, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=101:106, reduction = "pca", balanced = TRUE, cells =500)
+# DimHeatmap(WJRegenRealigned.integrated, dims=107:112, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=113:120, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=121:126, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=127:132, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=133:138, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=139:144, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJRegenRealigned.integrated, dims=145:150, reduction = "pca", balanced = TRUE, cells =500)
+
+WJRegenRealigned.integrated <- JackStraw(WJRegenRealigned.integrated, num.replicate=100, dims=150)
+WJRegen <- ScoreJackStraw(WJRegen, dims = 125:150)
+JackStrawPlot(WJRegenRealigned.Integrated, dims = 125:150)
+
+ElbowPlot(WJRegenRealigned.integrated, reduction = "pca", ndims = 150)
+```
+
+```{r Visualize Integration}
+WJRegenRealigned.integrated <- RunUMAP(WJRegenRealigned.integrated, dims = 1:150)
+DimPlot(WJRegenRealigned.integrated, group.by = "orig.ident")
+```
+
+```{r Assessing UMAP}
+DefaultAssay(WJRegenRealigned.integrated) <- "RNA"
+FeaturePlot(WJRegenRealigned.integrated, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), cols = c("lightcyan2", "red3"))
+
+FeaturePlot(WJRegenRealigned.integrated,
+            features = c("ifitm5", "spp1", "epcam", "pecam1", "mpx", "mpz", "myh11a", "col2a1a", "mpeg1.1", "krt4"), 
+            cols = c("lightcyan2", "red3"))
+FeaturePlot(WJRegenRealigned.integrated, 
+            features = c("nkx3-2", "trps1","dub", "prg4b", "f13a1b","sox9a", "sox10", "mia","col12a1a"), 
+            cols = c("lightcyan2", "red3"))
+FeaturePlot(WJRegenRealigned.integrated, 
+            features = c("thbs4a", "thbs4b","scxa",  "mkxa", "vwde","ucmaa", "ucmab", "tppp3","fn1b"), 
+            cols = c("lightcyan2", "red3"))
+```
+
+```{r Adding Dataset Metadata}
+Idents(WJRegenRealigned.integrated) <- "orig.ident"
+WJRegenRealigned.integrated.dataset <- c("Ctrl", "70d", "70d", "28d", "28d", "14d", "14d", "Ctrl", "Ctrl", "7d", "7d", "3d", "3d", "1d", "1d")
+names(WJRegenRealigned.integrated.dataset) <- levels(WJRegenRealigned.integrated)
+WJRegenRealigned.integrated <- RenameIdents(WJRegenRealigned.integrated, WJRegenRealigned.integrated.dataset)
+WJRegenRealigned.integrated@meta.data$dataset <- WJRegenRealigned.integrated@active.ident
+```
+
+#Broad Superclusters 
+
+```{r KNN and Superclustering}
+#Use 150 based on dimensionality testing
+DefaultAssay(WJRegenRealigned.integrated) <- "integrated"
+WJRegenRealigned.integrated <- FindNeighbors(WJRegenRealigned.integrated, dims = 1:150)
+WJRegenRealigned.integrated <- FindClusters(WJRegenRealigned.integrated, resolution = 0.02)
+
+WJRegenRealigned.integrated <- RunUMAP(WJRegenRealigned.integrated, dims=1:150)
+
+DimPlot(WJRegenRealigned.integrated, reduction="umap", label = TRUE, pt.size=1)
+DimPlot(WJRegenRealigned.integrated, reduction = "umap", label=FALSE, pt.size=1, group.by = "orig.ident")
+DimPlot(WJRegenRealigned.integrated, reduction = "umap", label=F, pt.size=1, split.by = "dataset")
+```
+```{r Renaming superclusters}
+Idents(WJRegenRealigned.integrated) <- "seurat_clusters"
+WJRegenRealigned.integrated.seurat_clusters <- c("Skeletal 1", "Epithelial", "Immune 1", "Skeletal 2", "Neural", "Endothelial", "Perivascular", "Muscular", "Immune 2", "Odontoblasts")
+names(WJRegenRealigned.integrated.seurat_clusters) <- levels(WJRegenRealigned.integrated)
+WJRegenRealigned.integrated <- RenameIdents(WJRegenRealigned.integrated, WJRegenRealigned.integrated.seurat_clusters)
+WJRegenRealigned.integrated$seurat_clusters <- factor(WJRegenRealigned.integrated$seurat_clusters, levels = c("Skeletal 1", "Skeletal 2", "Immune 1", "Immune 2", "Epithelial", "Endothelial", "Perivascular", "Muscular", "Neural", "Odontoblasts"))
+DimPlot(WJRegenRealigned.integrated, reduction="umap", label = FALSE, pt.size=1, group.by = "seurat_clusters", cols = c("pink", "coral2", "turquoise3", "magenta3", "orange", "green4", "purple", "red3", "blue", "green"))
+```
+
+
+```{r Renaming datasets}
+Idents(WJ.NCSubset) <- "dataset"
+WJ.NCSubset.dataset <- c("Uninjured", "1 dpjr", "3 dpjr", "7 dpjr", "14 dpjr", "28 dpjr", "70 dpjr")
+names(WJ.NCSubset.dataset) <- levels(WJ.NCSubset)
+WJ.NCSubset <- RenameIdents(WJ.NCSubset, WJ.NCSubset.dataset)
+WJ.NCSubset@meta.data$dataset <- WJ.NCSubset@active.ident
+DimPlot(WJ.NCSubset, reduction="umap", label = FALSE, pt.size=1, group.by = "dataset", order = c("70 dpjr", "28 dpjr", "14 dpjr", "7 dpjr", "3 dpjr", "1 dpjr", "Uninjured"), cols = c("red3", "coral3", "orange", "blue", "turquoise", "turquoise4", "purple"))
+```
+
+
+```{r Making an ordered DotPlot}
+WJRegenRealigned.integrated$seurat_clusters <- factor(WJRegenRealigned.integrated$seurat_clusters, levels = c("Skeletal 1", "Skeletal 2", "Immune 1", "Immune 2", "Epithelial", "Endothelial", "Perivascular", "Muscular", "Neural", "Odontoblasts"))
+DotPlot(WJRegenRealigned.integrated, features = c("prrx1b","bglap","mpx","mpeg1.1","ikzf1","epcam","pecam1","myh11a", "myod1","mpz","scpp1"), cols = c("lightcyan2", "red3"), dot.scale = 10, group.by = "seurat_clusters")
+```
+
+```{r Superclustering DotPlot}
+DefaultAssay(WJRegenRealigned.integrated) <- "RNA"
+DotPlot(WJRegenRealigned.integrated, features = c("epcam","pecam1","col2a1a","ifitm5","prg4b","coch","col12a1a","thbs4a", "spi1b","mpeg1.1","lck","cd8a","ikzf1","mpx","krt4", "fn1b", "fn1a", "mdka", "col10a1a", "prrx1b", "muc5.1"), cols = c("lightcyan2", "red3"), dot.scale = 10)
+```
+
+#Higher resolution clustering
+
+```{r KNN and Superclustering}
+#Use 150 based on dimensionality testing
+DefaultAssay(WJRegenRealigned.integrated) <- "integrated"
+WJRegenRealigned.integrated <- FindNeighbors(WJRegenRealigned.integrated, dims = 1:150)
+WJRegenRealigned.integrated <- FindClusters(WJRegenRealigned.integrated, resolution = 0.9)
+
+WJRegenRealigned.integrated <- RunUMAP(WJRegenRealigned.integrated, dims=1:150)
+
+
+DimPlot(WJRegenRealigned.integrated, reduction = "umap", label=FALSE, pt.size=1, group.by = "orig.ident")
+DimPlot(WJRegenRealigned.integrated, reduction = "umap", label=F, pt.size=1, split.by = "dataset")
+```
+
+```{r Assessing Clustering}
+DefaultAssay(WJRegenRealigned.integrated) <- "RNA"
+FeaturePlot(WJRegenRealigned.integrated, features = c("epcam", "pecam1", "ifitm5", "col2a1a","col12a1a", "thbs4a", "prg4b","dub" , "lyz","mpeg1.1", "spi1b", "mpx"), cols = c("lightcyan2", "red3"))
+FeaturePlot(WJRegenRealigned.integrated, features = c("epcam", "pecam1", "muc5.1", "trpv6", "krt4", "krtt1c19e", "tp63"), cols = c("lightcyan2", "red3"))
+FeaturePlot(WJRegenRealigned.integrated, features = c("nkx3-2", "trps1","dub",  "prg4b", "f13a1b","sox9a", "sox10", "mia","col12a1a"), cols = c("lightcyan2", "red3"))
+FeaturePlot(WJRegenRealigned.integrated, features = c("thbs4a", "thbs4b","scxa",  "mkxa", "vwde","ucmaa", "ucmab", "tppp3","fn1b"), cols = c("lightcyan2", "red3"))
+```
+
+```{r Counts Table}
+DefaultAssay(WJRegenRealigned.integrated) <- "RNA"
+WJRegenRealigned.integrated.CountsTable <- table(WJRegenRealigned.integrated@meta.data$orig.ident, WJRegenRealigned.integrated@meta.data$seurat_clusters)
+```
+
+```{r Cluster AllMarkers}
+DefaultAssay(WJRegenRealigned.integrated) <- "RNA"
+WJRegenRealigned.integrated.findallmarkers <- FindAllMarkers(WJRegenRealigned.integrated, only.pos = TRUE, min.pct = 0.10, logfc.threshold = 0.20)
+```
+
+
+```{r Subsetting neural crest clusters}
+WJ.NCSubset <- subset(WJRegenRealigned.integrated, idents = c(1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 15, 16, 17, 18, 19, 24, 25, 27))
+WJ.NCSubset <- FindVariableFeatures(WJ.NCSubset, selection.method = "vst")
+DefaultAssay(WJ.NCSubset) <- "integrated"
+all.genes <- rownames(WJ.NCSubset)
+WJ.NCSubset <- ScaleData(WJ.NCSubset, features = all.genes)
+WJ.NCSubset <- RunPCA(WJ.NCSubset, verbose = FALSE, npcs = 150)
+```
+
+```{r Testing Dimensionality}
+DimHeatmap(WJ.NCSubset, dims=1:6, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=7:12, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=13:18, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=19:24, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=25:30, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=31:36, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=37:42, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=43:50, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=53:58, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=59:64, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=65:70, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=71:76, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=75:80, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=81:86, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=87:92, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=93:100, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=101:106, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=107:112, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=113:120, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=121:126, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=127:132, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=133:138, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=139:144, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.NCSubset, dims=145:150, reduction = "pca", balanced = TRUE, cells =500)
+```
+
+```{r KNN and Superclustering of NC Subset}
+#Use 150 based on dimensionality testing
+DefaultAssay(WJ.NCSubset) <- "integrated"
+WJ.NCSubset <- FindNeighbors(WJ.NCSubset, dims = 1:150)
+WJ.NCSubset <- FindClusters(WJ.NCSubset, resolution = 0.9)
+
+WJ.NCSubset <- RunUMAP(WJ.NCSubset, dims=1:150)
+
+DimPlot(WJ.NCSubset, reduction="umap", label = TRUE, pt.size=1)
+DimPlot(WJ.NCSubset, reduction = "umap", label=FALSE, pt.size=1, group.by = "orig.ident")
+DimPlot(WJ.NCSubset, reduction = "umap", label=F, pt.size=1, split.by = "dataset")
+```
+
+
+```{r Reorder datasets}
+WJ.NCSubset$dataset <- factor(WJ.NCSubset$dataset, levels = c("Ctrl", "1d", "3d", "7d", "14d", "28d", "70d"))
+```
+
+```{r}
+DimPlot(WJ.NCSubset, reduction="umap", label = FALSE, pt.size=1, group.by = "dataset", order = c("70d", "28d", "14d", "7d", "3d", "1d", "Ctrl"), cols = c("red3", "coral3", "orange", "blue", "turquoise", "turquoise4", "purple"))
+```
+
+```{r Subsetting NC clusters without 18 and 22 to create skeletal object}
+WJ.Skeletal <- subset(WJ.NCSubset, idents = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21))
+WJ.Skeletal <- FindVariableFeatures(WJ.Skeletal, selection.method = "vst")
+DefaultAssay(WJ.Skeletal) <- "integrated"
+all.genes <- rownames(WJ.Skeletal)
+WJ.Skeletal <- ScaleData(WJ.Skeletal, features = all.genes)
+WJ.Skeletal <- RunPCA(WJ.Skeletal, verbose = FALSE, npcs = 150)
+```
+
+```{r Testing Dimensionality}
+DimHeatmap(WJ.Skeletal, dims=1:6, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=7:12, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=13:18, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=19:24, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=25:30, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=31:36, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=37:42, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=43:50, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=53:58, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=59:64, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=65:70, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=71:76, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=75:80, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=81:86, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=87:92, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=93:100, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=101:106, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=107:112, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=113:120, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=121:126, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=127:132, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=133:138, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=139:144, reduction = "pca", balanced = TRUE, cells =500)
+DimHeatmap(WJ.Skeletal, dims=145:150, reduction = "pca", balanced = TRUE, cells =500)
+```
+
+```{r KNN and Superclustering of Skeletal Subset}
+#Use 150 based on dimensionality testing
+DefaultAssay(WJ.Skeletal) <- "integrated"
+WJ.Skeletal <- FindNeighbors(WJ.Skeletal, dims = 1:150)
+WJ.Skeletal <- FindClusters(WJ.Skeletal, resolution = 0.95)
+
+WJ.Skeletal <- RunUMAP(WJ.Skeletal, dims=1:150)
+
+DimPlot(WJ.Skeletal, reduction="umap", label = TRUE, pt.size=1)
+DimPlot(WJ.Skeletal, reduction = "umap", label=FALSE, pt.size=1, group.by = "orig.ident")
+DimPlot(WJ.Skeletal, reduction = "umap", label=F, pt.size=1, split.by = "dataset")
+```
+
+
+```{r}
+DimPlot(WJ.Skeletal, reduction="umap", label = FALSE, pt.size=1, group.by = "dataset", order = c("70d", "28d", "14d", "7d", "3d", "1d", "Ctrl"), cols = c("red3", "coral3", "orange", "blue", "turquoise", "turquoise4", "purple"))
+```
+
+```{r Renaming datasets}
+Idents(WJ.Skeletal) <- "dataset"
+WJ.Skeletal.dataset <- c("Uninjured", "1 dpjr", "3 dpjr", "7 dpjr", "14 dpjr", "28 dpjr", "70 dpjr")
+names(WJ.Skeletal.dataset) <- levels(WJ.Skeletal)
+WJ.Skeletal <- RenameIdents(WJ.Skeletal, WJ.Skeletal.dataset)
+WJ.Skeletal@meta.data$dataset <- WJ.Skeletal@active.ident
+DimPlot(WJ.Skeletal, reduction="umap", label = FALSE, pt.size=0.5, group.by = "dataset", order = c("70 dpjr", "28 dpjr", "14 dpjr", "7 dpjr", "3 dpjr", "1 dpjr", "Uninjured"), cols = c("green", "coral3", "orange", "blue", "cyan", "pink1", "purple"))
+```
+
+
+```{r Counts Table}
+DefaultAssay(WJ.Skeletal) <- "RNA"
+WJ.Skeletal.CountsTable <- table(WJ.Skeletal@meta.data$orig.ident, WJ.Skeletal@meta.data$seurat_clusters)
+```
+
+
+```{r Cluster AllMarkers}
+DefaultAssay(WJ.Skeletal) <- "RNA"
+WJ.Skeletal.findallmarkers <- FindAllMarkers(WJ.Skeletal, only.pos = TRUE, min.pct = 0.10, logfc.threshold = 0.20)
+```
+
+```{r Renaming skeletal clusters}
+Idents(WJ.Skeletal) <- "seurat_clusters"
+WJ.Skeletal.seurat_clusters <- c("Periosteum", "DF 1", "DF 2", "DF 3", "Osteoblasts", "Stroma 1", "Regenerative Mesenchyme", "Stroma 2", "DF 4", "Stroma 3", "DF 5", "DF 6", "Chondrocytes", "Chondrogenic Fibroblasts", "DF 7", "Synoviocytes", "Stroma 4", "DF 8", "Lig/Ten", "Perivascular", "Stroma 5")
+names(WJ.Skeletal.seurat_clusters) <- levels(WJ.Skeletal)
+WJ.Skeletal <- RenameIdents(WJ.Skeletal, WJ.Skeletal.seurat_clusters)
+WJ.Skeletal@meta.data$seurat_clusters <- WJ.Skeletal@active.ident
+# levels(WJ.Skeletal@meta.data$seurat_clusters) <- c("Osteoblasts", "Chondrocytes", "Synoviocytes", "Lig/Ten", "Periosteum", "Perivascular", "DF 1", "DF 2", "DF 3", "DF 4", "DF 5", "DF 6", "DF 7", "DF 8", "Stroma 1", "Stroma 2", "Stroma 3", "Stroma 4", "Stroma 5", "Chondrogenic Fibroblasts", "Regenerative Mesenchyme")
+WJ.Skeletal$seurat_clusters <- factor(WJ.Skeletal$seurat_clusters, levels = c("Osteoblasts", "Chondrocytes", "Synoviocytes", "Lig/Ten", "Periosteum", "Perivascular", "DF 1", "DF 2", "DF 3", "DF 4", "DF 5", "DF 6", "DF 7", "DF 8", "Stroma 1", "Stroma 2", "Stroma 3", "Stroma 4", "Stroma 5", "Chondrogenic Fibroblasts", "Regenerative Mesenchyme"))
+```
+
+
+```{r Plotting skeletal clusters}
+Idents(WJ.Skeletal) <- "seurat_clusters"
+DimPlot(WJ.Skeletal, reduction="umap", label = FALSE, pt.size=0.5, group.by = "seurat_clusters", cols = c("pink", "coral3", "green2", "magenta2", "purple", "pink3", "turquoise", "turquoise2", "turquoise3", "turquoise4", "cyan", "cyan2", "cyan3", "cyan4", "orange", "orange2", "orange3", "yellow3", "yellow2", "green4", "navy"))
+```
+
+
+
+
+
+```
+
+
+
+
+
+
+
+```
+
