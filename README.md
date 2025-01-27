@@ -1,0 +1,1 @@
+The codes used to define transcriptional and cellular mechanisms driving whole-joint regeneration in our publication: "Dynamic cell fate plasticity and tissue integration drive functional synovial joint regeneration"
