@@ -1,4 +1,4 @@
-The codes used to define transcriptional and cellular mechanisms driving whole-joint regeneration in our publication: "Dynamic cell fate plasticity and tissue integration drive functional synovial joint regeneration"
+The codes used to define transcriptional and cellular mechanisms driving whole-joint regeneration in our publication: "Dynamic cell fate plasticity drives functional synovial joint regeneration"
 
 scRNAseq libraries were analyzed using R version 4.4.0 in RStudio with Seurat (v5.0.3.).
 
