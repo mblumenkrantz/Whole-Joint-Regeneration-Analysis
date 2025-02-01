@@ -1,0 +1,170 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+# clear environment
+rm(list = ls())
+```
+
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(patchwork)
+```
+
+
+```{r}
+
+
+create_vertices <- function(n) {
+  #theta <- seq(0, 2 * pi, length.out = n + 1)[-1]
+  theta <- seq(0, 2 * pi, length.out = n + 1)
+  theta <- theta[-length(theta)]
+  data.frame(x = cos(theta), y = sin(theta))
+}
+
+simplex2_with_pseudotime <- function(points, pseudotime, max_pseudotime, origin = c(0, 0), show_points = TRUE, 
+                                     point_size = 2, show_edges = TRUE, show_vertices = TRUE, 
+                                     vertices_color = "black", vertices_size = 2, 
+                                     show_labels = TRUE, return_vertices = FALSE, title="") {
+  
+  points <- as.matrix(points)
+  n <- ncol(points)
+  vertices <- create_vertices(n)
+  
+  points_projected <- apply(points, 1, function(row) row %*% as.matrix(vertices))
+  points_projected <- t(points_projected)
+  points_projected <- data.frame(points_projected, pseudotime = pseudotime)
+  
+  # Create a ggplot with pseudotime as color
+  p <- ggplot(points_projected, aes(x = X1, y = X2, color = pseudotime)) +
+    geom_point(size = point_size, alpha = 0.6) +
+    scale_color_viridis_c(limits=c(0, max_pseudotime)) +  # Color scale for pseudotime
+    theme_void() +
+    coord_equal(clip = 'off') +
+    ggtitle(title)
+  
+  kombinacje <- combn(1:n, 2)
+  vector1 <- kombinacje[1, ]
+  vector2 <- kombinacje[2, ]
+  
+  for(i in 1:length(vector1)) {
+    p <- p + annotate("segment", x = vertices$x[vector1[i]], y = vertices$y[vector1[i]],
+                      xend = vertices$x[vector2[i]], yend = vertices$y[vector2[i]], color = "gray")
+  }
+  
+  if (show_vertices) {
+    vertices$categories <- paste0("ARCH", 1:n)
+    p <- p + geom_point(data = vertices, aes(x = x, y = y), size = vertices_size, color = vertices_color)
+  }
+  
+  if (return_vertices) {
+    return(list(p = p, vertices = vertices))
+  }
+  p
+}
+```
+
+```{r, echo=FALSE}
+cds <- readRDS("~/cds.RDS")
+```
+
+```{r}
+data_pseudotime <- data.frame(
+  pseudotime = cds@principal_graph_aux$UMAP$pseudotime,
+  dataset = cds@colData$dataset,
+  seurat_clusters = cds@colData$seurat_clusters
+)
+max_pseudotime <- max(data_pseudotime$pseudotime[data_pseudotime$pseudotime<Inf])
+print(max_pseudotime)
+head(data_pseudotime)
+```
+
+
+```{r}
+k <- 6
+df <- read.csv(paste0("~/similarity_df_", k, ".csv"))
+rownames(df) <- df$X
+df <- df[,-1]
+colnames(df) <- sapply(colnames(df), function(colname) {
+  if(grepl("^ARCH\\d+$", colname)) {
+    # Extract the number, increment by 1, and reconstruct the name
+    num <- as.numeric(sub("ARCH", "", colname)) + 1
+    paste0("ARCH", num)
+  } else {
+    colname  # Leave other column names unchanged
+  }
+})
+head(df)
+
+```
+
+
+
+```{r}
+cell_order <- rownames(data_pseudotime)
+print(head(cell_order))
+df <- df[cell_order , ]
+```
+
+
+
+
+
+```{r}
+df_combined <- merge(df, data_pseudotime, by = "row.names", all = TRUE)
+rownames(df_combined) <- df_combined$Row.names
+df_combined$Row.names <- NULL
+head(df_combined)
+
+```
+
+
+
+
+```{r, fig.height=4, fig.width=10}
+which_rows <-  df_combined$seurat_clusters== "Chondrocytes" | df_combined$seurat_clusters== "Osteoblasts" | df_combined$seurat_clusters == "1-3 dpjr Mesenchyme"
+subset_to_plot <- df_combined[  which_rows, ]
+
+subset_to_plot1 <-  subset_to_plot[ subset_to_plot$dataset == "1 dpjr",]
+subset_to_plot3 <-  subset_to_plot[ subset_to_plot$dataset == "3 dpjr",]
+subset_to_plot7 <-  subset_to_plot[ subset_to_plot$dataset == "7 dpjr",]
+subset_to_plot14 <-  subset_to_plot[ subset_to_plot$dataset == "14 dpjr",]
+subset_to_plot28 <-  subset_to_plot[ subset_to_plot$dataset == "28 dpjr",]
+subset_to_plot70 <-  subset_to_plot[ subset_to_plot$dataset == "70 dpjr",]
+subset_to_plotUninjured <-  subset_to_plot[ subset_to_plot$dataset == "Uninjured",]
+
+plot1 <- simplex2_with_pseudotime(points = subset_to_plot1[,1:k], 
+                                 pseudotime =  subset_to_plot1$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plot3 <- simplex2_with_pseudotime(points = subset_to_plot3[,1:k], 
+                                 pseudotime =  subset_to_plot3$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plot7 <- simplex2_with_pseudotime(points = subset_to_plot7[,1:k], 
+                                 pseudotime =  subset_to_plot7$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plot14 <- simplex2_with_pseudotime(points = subset_to_plot14[,1:k], 
+                                 pseudotime =  subset_to_plot14$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plot28 <- simplex2_with_pseudotime(points = subset_to_plot28[,1:k], 
+                                 pseudotime =  subset_to_plot28$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plot70 <- simplex2_with_pseudotime(points = subset_to_plot70[,1:k], 
+                                 pseudotime =  subset_to_plot70$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+plotUninjured <- simplex2_with_pseudotime(points = subset_to_plotUninjured[,1:k], 
+                                 pseudotime =  subset_to_plotUninjured$pseudotime, max_pseudotime= max_pseudotime, point_size = 1)
+
+
+combined_plot <- (plot1 + ggtitle("1 dpjr") + plot3 + ggtitle("3 dpjr") + plot7+ ggtitle("7 dpjr") + plot14+ ggtitle("14 dpjr") + plot28+ ggtitle("28 dpjr") + plot70+ ggtitle("70 dpjr") + plotUninjured+ ggtitle("Uninjured")) +
+                 plot_layout(ncol = 4, guides = "collect") & 
+                 theme(legend.position = "right")
+
+# Display the final plot
+combined_plot
+
+```

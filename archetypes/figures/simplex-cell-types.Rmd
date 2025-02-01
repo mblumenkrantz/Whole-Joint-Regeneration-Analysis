@@ -1,0 +1,231 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# clear environment
+rm(list = ls())
+```
+
+
+```{r}
+#k <- as.numeric(params$numberofarch)
+k <- 6
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(Matrix)
+library(patchwork)
+library(RColorBrewer)
+library(clusterProfiler)
+library(org.Dr.eg.db)
+library(enrichplot)
+library(gridExtra)
+library(reshape2)
+library(scales)
+library(tidyr)
+library(pheatmap)
+library(rlang)
+library(factoextra)
+
+```
+
+
+
+```{r setup, include=FALSE, echo=FALSE}
+create_vertices <- function(n) {
+  #theta <- seq(0, 2 * pi, length.out = n + 1)[-1]
+  theta <- seq(0, 2 * pi, length.out = n + 1)
+  theta <- theta[-length(theta)]
+  data.frame(x = cos(theta), y = sin(theta))
+}
+
+simplex2 <- function(points, celltypes, kolory, origin = c(0, 0), show_points = TRUE, point_size = 2,
+                     show_edges = TRUE, show_vertices = TRUE, vertices_color = "black",
+                     vertices_size = 4, show_labels = TRUE, return_vertices = FALSE, title="") {
+
+
+  points <- as.matrix(points)  # Convert to numeric matrix
+
+  n <- ncol(points)  # Number of ARCH columns
+  vertices <- create_vertices(n)
+  vertices <- as.data.frame(vertices)  # Ensure vertices is a data frame
+
+  
+  points_projected <- apply(points, 1, function(row) {
+  #  row <- as.numeric(row)  # Ensure row is numeric
+    points_rescaled <- row %*% as.matrix(vertices)  # Matrix multiplication
+    return(points_rescaled)
+  })
+
+  points_projected <- t(points_projected)  
+  points_projected <- data.frame(points_projected)
+
+  # Add celltypes to the projected data
+  plot_data <- cbind(points_projected, celltypes = celltypes)
+
+  # Basic ggplot with points colored by cell types
+  p <- ggplot(plot_data, aes(x = X1, y = X2, color = celltypes)) +
+    geom_point(size = point_size, alpha = 0.6) +
+    theme_void() +
+    scale_color_manual(values = kolory) +  # Using manual color scale based on the provided kolory
+    coord_equal(clip = 'off') #+ coord_fixed()
+  
+  kombinacje <- combn(1:k, 2)
+  vector1 <- kombinacje[1, ]
+  vector2 <- kombinacje[2, ]
+
+    for(i in 1:length(vector1)){
+  p <- p + annotate("segment", x = vertices$x[vector1[i]], y = vertices$y[vector1[i]],
+               xend = vertices$x[vector2[i]], yend = vertices$y[ vector2[i]   ],
+               color = "gray")
+    }
+  vertices$cat <- colnames(points)
+   p<- p + geom_text(data =vertices, aes(x = x, y = y, label = cat),
+                       size = 3, color = "black", nudge_y= 0.1)  
+   
+     # Adding vertices if show_vertices is TRUE
+  if (show_vertices) {
+    vertices$categories <- paste0("ARCH", 1:n)
+    p <- p + geom_point(data = vertices, aes(x = x, y = y), size = vertices_size, color = vertices_color) + ggtitle(title) 
+  }
+
+
+  # Return plot or vertices as needed
+  if (return_vertices) {
+    return(list(p = p, vertices = vertices))
+  }
+  p
+}
+
+
+```
+
+
+
+
+### Reading data (skeletal subset)
+```{r}
+WJ.Skeletal <- readRDS("~/WJ.Skeletal.RDS")
+
+```
+
+
+### Creating a new seurat object with raw counts, metadata (seurat clusters, dataset) and umap embeddings 
+```{r}
+counts <- GetAssayData(WJ.Skeletal, layer = "counts", assay = "RNA")
+meta_data <- WJ.Skeletal@meta.data[, c("seurat_clusters", "dataset")]
+new_seurat_obj <- CreateSeuratObject(
+  counts = counts,
+  meta.data = meta_data
+)
+umap_embeddings <- Embeddings(WJ.Skeletal, reduction = "umap")
+
+umap_dimreduc <- CreateDimReducObject(
+  embeddings = as.matrix(umap_embeddings),
+  key = "UMAP_",                   # Prefix for UMAP dimensions
+  assay = DefaultAssay(new_seurat_obj)  # Typically "RNA"
+)
+
+new_seurat_obj[["umap"]] <- umap_dimreduc
+Idents(new_seurat_obj) <- "seurat_clusters"
+
+print(new_seurat_obj)
+```
+
+
+### Clustering
+
+```{r}
+DimPlot(new_seurat_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE) +
+  ggtitle("Seurat_clusters") +  theme_minimal()
+```
+
+
+```{r}
+k <- 6
+# Read the CSV file and set the row names
+df <- read.csv(paste0("~/similarity_df_", k, ".csv"))
+rownames(df) <- df$X
+df <- df[,-1]
+
+# Find and modify column names that start with "ARCH"
+colnames(df) <- sapply(colnames(df), function(colname) {
+  if(grepl("^ARCH\\d+$", colname)) {
+    # Extract the number, increment by 1, and reconstruct the name
+    num <- as.numeric(sub("ARCH", "", colname)) + 1
+    paste0("ARCH", num)
+  } else {
+    colname  # Leave other column names unchanged
+  }
+})
+
+# Display the first few rows to confirm
+head(df)
+```
+
+### Ordering cells according to seurat object
+
+```{r}
+cell_order <- rownames(new_seurat_obj@assays$RNA@cells@.Data)
+print(head(cell_order))
+df_ordered <- df[cell_order , ]
+knitr::kable(head(df_ordered))
+```
+
+
+```{r}
+df_ordered$"seurat_clusters" <- new_seurat_obj@meta.data$seurat_clusters
+df_ordered$"dataset" <- new_seurat_obj@meta.data$dataset
+knitr::kable(head(df_ordered))
+```
+
+
+```{r}
+clusters <- levels(WJ.Skeletal@meta.data$seurat_clusters)
+
+# Define the color palette
+paleta <- c("pink", "coral3", "green3", "magenta2", "purple", "blue", "turquoise",
+            "turquoise2", "turquoise3", "turquoise4", "cyan", "cyan2", "cyan3",
+            "cyan4", "orange", "orange2", "orange3", "yellow3", "yellow2",
+            "pink3", "navy")
+
+# Match each cluster to a color in paleta
+cluster_colors <- setNames(paleta, clusters)
+cluster_colors
+
+```
+
+
+
+```{r, fig.height=8, fig.width=16}
+library(patchwork)
+list_plots <- list()
+
+which_rows <- df_ordered$seurat_clusters %in% c("DF 1", "Synoviocytes", "Stroma 3", "DF 4", "Osteoblasts", "Lig/Ten", "1-3 dpjr Mesenchyme", "Chondrogenic Fibroblasts", "Chondrocytes")
+subset_to_plot <- df_ordered[which_rows, ]
+
+all_data_sets <- levels(factor(subset_to_plot$dataset))
+
+i <- 1
+for (dt in all_data_sets) {
+  subset_to_plot_time_point <- subset_to_plot[subset_to_plot$dataset == dt, ]
+  list_plots[[i]] <- simplex2(subset_to_plot_time_point[1:k], subset_to_plot_time_point[, "seurat_clusters"], cluster_colors, title = dt, point_size = 1.5) +
+    labs(color = "Cell types") +
+    theme(legend.title = element_text(size = 14),
+          legend.text = element_text(size = 12)) + guides(color = guide_legend(override.aes = list(size=5)))
+  i <- i + 1
+}
+
+
+wrap_plots(list_plots, ncol = 4) +
+  plot_layout(guides = "collect") & 
+  theme(legend.position = "bottom", 
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm"))
+
+```
