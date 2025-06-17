@@ -1,0 +1,275 @@
+---
+title: "Monocle Skeletal Cells MB"
+output: html_document
+date: "2024-04-18"
+---
+
+```{r setup, include=FALSE}
+library(monocle3)
+library(Seurat)
+library(dplyr)
+library(SeuratWrappers)
+set.seed(1234)
+```
+
+```{r Install Packages}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
+                       'limma', 'lme4', 'S4Vectors', 'SingleCellExperiment',
+                       'SummarizedExperiment', 'batchelor', 'HDF5Array',
+                       'terra', 'ggrastr'))
+install.packages("devtools")
+devtools::install_github('cole-trapnell-lab/monocle3')
+remotes::install_github('satijalab/seurat-wrappers')
+library(monocle3)
+library(SeuratWrappers)
+library(dplyr)
+```
+
+
+```{r Starting with an existing, preanalyzed seurat object, convert existing seurat object to a monocle format cell_data_set and infer pseudotime}
+
+cds <- as.cell_data_set(Skeletal.Seurat)
+#cluster the cells using monocles algorithm
+cds <- cluster_cells(cds)
+#Learn a graph
+cds <- learn_graph(cds, use_partition = TRUE)
+plot_cells(cds,
+           color_cells_by = "seurat_clusters",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE)
+```
+
+```{r }
+# A helper function to identify the root principal points:
+get_earliest_principal_node <- function(cds, dataset = "1 dpjr"){
+  cell_ids <- which(colData(cds)[, "dataset"] == dataset)
+  
+  closest_vertex <-
+  cds@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex
+  closest_vertex <- as.matrix(closest_vertex[colnames(cds), ])
+  root_pr_nodes <-
+  igraph::V(principal_graph(cds)[["UMAP"]])$name[as.numeric(names
+  (which.max(table(closest_vertex[cell_ids,]))))]
+  
+  root_pr_nodes
+}
+
+cds <- order_cells(cds, root_pr_nodes=get_earliest_principal_node(cds))
+
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups = FALSE,
+           label_leaves = FALSE,
+           label_branch_points = FALSE,
+           graph_label_size=1.5)
+```
+
+
+```{r Analyze the subset of bone, cartilage, regenerative mesenchyme, and putative cartilage progenitors}
+
+Idents(Skeletal.Seurat) <- "seurat_clusters"
+subset.seurat <- subset(Skeletal.Seurat, idents = c("Osteoblasts", "Chondrocytes", "Chondrogenic Fibroblasts", "Regenerative Mesenchyme"))
+subset.seurat@meta.data$seurat_clusters <- subset.seurat@active.ident
+DefaultAssay(subset.seurat) <- "RNA"
+subset_cds <- as.cell_data_set(subset.seurat)
+subset_cds <- preprocess_cds(subset_cds, method = 'PCA')
+subset_cds <- align_cds(subset_cds, preprocess_method = 'PCA', alignment_group = 'orig.ident')
+subset_cds <- reduce_dimension(subset_cds, reduction_method = 'UMAP')
+#cluster the cells using monocles algorithm
+subset_cds <- cluster_cells(subset_cds)
+#Learn a graph
+subset_cds <- learn_graph(subset_cds, use_partition = FALSE)
+plot_cells(subset_cds,
+           color_cells_by = "seurat_clusters",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE,
+           graph_label_size=5)
+
+# A helper function to identify the root principal points:
+get_earliest_principal_node <- function(subset_cds, dataset = "1 dpjr"){
+  cell_ids <- which(colData(subset_cds)[, "dataset"] == dataset)
+  
+  closest_vertex <-
+  subset_cds@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex
+  closest_vertex <- as.matrix(closest_vertex[colnames(subset_cds), ])
+  root_pr_nodes <-
+  igraph::V(principal_graph(subset_cds)[["UMAP"]])$name[as.numeric(names
+  (which.max(table(closest_vertex[cell_ids,]))))]
+  
+  root_pr_nodes
+}
+
+subset_cds <- order_cells(subset_cds, root_pr_nodes=get_earliest_principal_node(subset_cds))
+
+
+plot_cells(subset_cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups = FALSE,
+           label_leaves = TRUE,
+           label_branch_points = FALSE,
+           graph_label_size=5)
+```
+
+
+```{r Plot genes that are differentially expressed on different paths through the trajectory}
+subset_cds_test_res <- graph_test(subset_cds, neighbor_graph="principal_graph", cores=4)
+
+rowData(subset_cds)$gene_short_name <- row.names(rowData(subset_cds))
+
+head(subset_cds_test_res, error=FALSE, message=FALSE, warning=FALSE)
+
+deg_ids <- rownames(subset(subset_cds_test_res[order(subset_cds_test_res$morans_I, decreasing = TRUE),], q_value < 0.05))
+
+plot_cells(subset_cds, genes=c("fn1a", "mdka", "col12a1a", "sox9a", "nkx3-2", "gdf5", "col10a1a", "sp7", "bglap"),
+           show_trajectory_graph=FALSE,
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           min_expr = 0.1)
+```
+
+
+```{r Plot gene modules as heatmap}
+gene_module_subset_final <- find_gene_modules(subset_cds[deg_ids,], resolution=c(10^seq(-6,-1)))
+cell_group_subset <- tibble::tibble(cell=row.names(colData(subset_cds)), 
+                                cell_group=colData(subset_cds)$seurat_clusters)
+agg_mat <- aggregate_gene_expression(subset_cds, gene_module_subset_final, cell_group_subset)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+pheatmap::pheatmap(agg_mat,
+                   scale="column", clustering_method="ward.D2")
+```
+
+
+```{r Plot gene modules along trajectory}
+
+plot_cells(subset_cds,
+           genes=gene_module_subset_final %>% filter(module %in% c(68, 31, 25, 43, 66, 23, 37)),
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+
+```{r Plot dynamics for a small set of genes as a function of pseudotime}
+
+# Cartilage trajectory
+
+cartilage_genes <- c("fn1a", "sox9a")
+cartilage_cds <- subset_cds[rowData(subset_cds)$gene_short_name %in% cartilage_genes,
+                            colData(subset_cds)$seurat_clusters %in% c("Regenerative Mesenchyme", "Chondrocytes", "Chondrogenic Fibroblasts")]
+
+# Remove cells with zero reads
+cartilage_cds <- cartilage_cds[,Matrix::colSums(exprs(cartilage_cds)) != 0]
+cartilage_cds <- estimate_size_factors(cartilage_cds)
+
+cartilage_cds <- order_cells(cartilage_cds)
+plot_genes_in_pseudotime(cartilage_cds,
+                         color_cells_by="dataset",
+                         min_expr=0.5)
+```
+
+```{r Plot dynamics for a small set of genes as a function of pseudotime}
+
+# Bone trajectory
+
+bone_genes <- c("fn1a", "mmp9", "sp7")
+bone_cds <- subset_cds[rowData(subset_cds)$gene_short_name %in% bone_genes,
+                            colData(subset_cds)$seurat_clusters %in% c("7", "4")]
+
+# Remove cells with zero reads
+bone_cds <- bone_cds[,Matrix::colSums(exprs(bone_cds)) != 0]
+bone_cds <- estimate_size_factors(bone_cds)
+
+bone_cds <- order_cells(bone_cds)
+plot_genes_in_pseudotime(bone_cds,
+                         color_cells_by="dataset",
+                         min_expr=0.5)
+```
+
+
+# Branch trajectory analysis of chondrogenic vs. osteogenic regenerative mesenchyme in Supplementary Fig. 15
+```{r Select cells for trajectory analysis}
+
+cds_subset_4 <- choose_cells(subset_cds)
+subset_pr_test_res <- graph_test(cds_subset_4, neighbor_graph="principal_graph", cores=4)
+rowData(cds_subset_4)$gene_short_name <- row.names(rowData(cds_subset_4))
+head(subset_pr_test_res, error=FALSE, message=FALSE, warning=FALSE)
+pr_deg_ids_4 <- row.names(subset(subset_pr_test_res, q_value < 0.05))
+```
+
+```{r Grouping these genes into modules can reveal fate specific genes or those that are activate immediate prior to or following the branch point}
+
+gene_module_df_4 <- find_gene_modules(cds_subset_4[pr_deg_ids_4,], resolution=0.1)
+```
+
+```{r Plot gene modules}
+
+agg_mat <- aggregate_gene_expression(cds_subset_4, gene_module_df_4)
+module_dendro <- hclust(dist(agg_mat))
+gene_module_df_4$module <- factor(gene_module_df_4$module, 
+                                levels = row.names(agg_mat)[module_dendro$order])
+
+plot_cells(cds_subset_4,
+           genes=gene_module_df_4,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+
+```{r Plot individual genes along branch trajectory}
+
+plot_cells(gene_module_df_4,
+           genes= c("aspn", "bmp2a", "bmp5", "bmp8a", "chrd", "grem2b", "chrdl2", "scube3", "bmper", "tgfbi", "wnt9a", "frzb", "dkk3b", "sfrp1a", "sfrp1b", "wnt5b", "fzd8a", "fgfr4", "fgfr2", "hapln1a", "aqp3a", "dcn", "nid1b", "runx2a", "spp1", "timp2b", "enpp1"),
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+# Branch trajectory analysis of chondrogenic fibroblasts in Supplementary Fig. 9
+```{r Select cells for trajectory analysis}
+
+chonfib_subset <- choose_cells(subset_cds)
+subset_pr_test_res <- graph_test(chonfib_subset, neighbor_graph="principal_graph", cores=4)
+rowData(chonfib_subset)$gene_short_name <- row.names(rowData(chonfib_subset))
+head(subset_pr_test_res, error=FALSE, message=FALSE, warning=FALSE)
+pr_deg_ids_chonfib <- row.names(subset(subset_pr_test_res, q_value < 0.05))
+```
+
+
+```{r Find gene modules}
+
+gene_module_df_chonfib <- find_gene_modules(chonfib_subset[pr_deg_ids_chonfib,], resolution=0.15)
+```
+
+
+```{r Plot gene modules}
+
+agg_mat <- aggregate_gene_expression(chonfib_subset, gene_module_df_chonfib)
+module_dendro <- hclust(dist(agg_mat))
+gene_module_df_chonfib$module <- factor(gene_module_df_chonfib$module, 
+                                levels = row.names(agg_mat)[module_dendro$order])
+
+plot_cells(chonfib_subset,
+           genes=gene_module_df_chonfib,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+
+```{r Plotting individual genes along branch trajectory}
+
+plot_cells(chonfib_subset,
+           genes= c("prrx1b", "mdka", "col1a1a", "col1a2", "trps1", "nkx3-2", "sox9a", "clu", "f13a1b", "prg4b", "ucmab", "col2a1a", "cnmd", "acanb"),
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+
+
+
+
+
+
+
+
